@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: m3u8-downloader
+    env: python
+    buildCommand: ""
+    startCommand: gunicorn main:app --bind 0.0.0.0:$PORT
+    runtime: python
+    region: oregon
+    plan: free
