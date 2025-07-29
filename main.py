@@ -1,54 +1,66 @@
 from flask import Flask, request, send_file
 import subprocess
-import uuid
 import os
+import uuid
 
 app = Flask(__name__)
 
-# ✅ Optional: Install ffmpeg if not already available (for Render)
-def ensure_ffmpeg():
-    if not os.path.exists("/usr/bin/ffmpeg"):
-        os.system("apt-get update && apt-get install -y ffmpeg")
+def is_m3u8(url):
+    return url.endswith(".m3u8") or ".m3u8?" in url
 
-ensure_ffmpeg()
+def generate_filename():
+    return f"{uuid.uuid4().hex}.mp4"
 
-@app.route('/')
-def index():
+@app.route("/")
+def home():
     return '''
-    <h2>🎬 M3U8 Video Downloader</h2>
-    <form method="POST" action="/download">
-        <input name="url" type="text" placeholder="Enter M3U8 URL" style="width:400px;" required>
+    <h2>📥 Multi Video Downloader</h2>
+    <form method="post" action="/download">
+        <input name="url" type="text" placeholder="Paste YouTube / TikTok / M3U8 URL" style="width:400px;" required>
         <button type="submit">Download</button>
     </form>
     '''
 
-@app.route('/download', methods=['POST'])
+@app.route("/download", methods=["POST"])
 def download():
-    url = request.form.get('url')
-    if not url:
-        return "❌ No URL provided", 400
-
-    filename = f"video_{uuid.uuid4().hex}.mp4"
+    url = request.form.get("url")
+    filename = generate_filename()
 
     try:
-        # ✅ Run ffmpeg to download the video
-        result = subprocess.run([
-            'ffmpeg', '-i', url,
-            '-c', 'copy', '-bsf:a', 'aac_adtstoasc',
-            filename
-        ], check=True)
+        if is_m3u8(url):
+            # Use ffmpeg
+            headers = (
+                "User-Agent: Mozilla/5.0\r\n"
+                "Referer: https://example.com\r\n"
+            )
 
-        # ✅ Send the file as download response
+            cmd = [
+                "ffmpeg",
+                "-headers", headers,
+                "-i", url,
+                "-c", "copy",
+                "-bsf:a", "aac_adtstoasc",
+                filename
+            ]
+        else:
+            # Use yt-dlp
+            cmd = [
+                "yt-dlp",
+                "-o", filename,
+                "-f", "mp4",
+                url
+            ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        if result.returncode != 0:
+            return f"<h3>❌ Error</h3><pre>{result.stderr}</pre>", 500
+
         return send_file(filename, as_attachment=True)
 
-    except subprocess.CalledProcessError as e:
-        return f"❌ Download failed: {str(e)}", 500
-
     finally:
-        # ✅ Clean up the file after response
         if os.path.exists(filename):
             os.remove(filename)
 
-# ✅ Run Flask (for local dev or Gunicorn)
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=os.environ.get("PORT", 10000))
