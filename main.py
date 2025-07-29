@@ -1,57 +1,59 @@
-from flask import Flask, request, send_file
-import subprocess
 import os
-import uuid
+import subprocess
+from flask import Flask, request, render_template, send_file, flash, redirect, url_for
 
 app = Flask(__name__)
+app.secret_key = "supersecretkey"  # for flash messages
+COOKIE_FILE = "cookies.txt"
 
-def is_m3u8(url):
-    return url.endswith(".m3u8") or ".m3u8?" in url
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        # Upload cookies.txt file
+        if "cookies" in request.files:
+            cookies = request.files["cookies"]
+            if cookies.filename == "":
+                flash("No cookies file selected")
+            else:
+                cookies.save(COOKIE_FILE)
+                flash("Cookies uploaded successfully!")
+                return redirect(url_for("index"))
+        # Download video
+        elif "url" in request.form:
+            url = request.form.get("url").strip()
+            if not os.path.exists(COOKIE_FILE):
+                flash("Please upload cookies.txt first!")
+                return redirect(url_for("index"))
 
-def generate_filename():
-    return f"{uuid.uuid4().hex}.mp4"
+            filename = "video.mp4"
+            # Remove old file if exists
+            if os.path.exists(filename):
+                os.remove(filename)
 
-@app.route("/")
-def home():
-    return '''
-    <h2>📥 Multi Video Downloader</h2>
-    <form method="post" action="/download">
-        <input name="url" type="text" placeholder="Paste YouTube / TikTok / M3U8 URL" style="width:400px;" required>
-        <button type="submit">Download</button>
-    </form>
-    '''
-
-@app.route("/download", methods=["POST"])
-def download():
-    url = request.form.get("url")
-    filename = generate_filename()
-
-    try:
-        if is_m3u8(url):
-            # Use ffmpeg
-            headers = (
-                "User-Agent: Mozilla/5.0\r\n"
-                "Referer: https://example.com\r\n"
-            )
             cmd = [
-                "ffmpeg", "-headers", headers, "-i", url,
-                "-c", "copy", "-bsf:a", "aac_adtstoasc", filename
+                "yt-dlp",
+                "--cookies", COOKIE_FILE,
+                "-f", "mp4",
+                "-o", filename,
+                url
             ]
-        else:
-            # Use yt-dlp
-            cmd = ["yt-dlp", "-f", "mp4", "-o", filename, url]
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                if result.returncode != 0:
+                    flash(f"Download failed: {result.stderr}")
+                    return redirect(url_for("index"))
+                else:
+                    return send_file(filename, as_attachment=True)
+            except subprocess.TimeoutExpired:
+                flash("Download timed out!")
+                return redirect(url_for("index"))
+            except Exception as e:
+                flash(f"Error: {str(e)}")
+                return redirect(url_for("index"))
 
-        if result.returncode != 0:
-            return f"<h3>❌ Error</h3><pre>{result.stderr}</pre>", 500
+    return render_template("index.html")
 
-        return send_file(filename, as_attachment=True)
-
-    finally:
-        if os.path.exists(filename):
-            os.remove(filename)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=8080)
