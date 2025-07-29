@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Video Downloader</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2em; max-width: 600px; }
+    input[type=text], input[type=file] { width: 100%; padding: 8px; margin: 8px 0; }
+    button { padding: 10px 15px; }
+    .flash { color: red; }
+  </style>
+</head>
+<body>
+  <h1>Video Downloader (YouTube / TikTok)</h1>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <ul class="flash">
+        {% for message in messages %}
+          <li>{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+
+  <h2>Step 1: Upload your cookies.txt</h2>
+  <form method="post" enctype="multipart/form-data">
+    <input type="file" name="cookies" accept=".txt" required />
+    <button type="submit">Upload Cookies</button>
+  </form>
+
+  <h2>Step 2: Enter video URL to download</h2>
+  <form method="post">
+    <input type="text" name="url" placeholder="Paste YouTube or TikTok URL here" required />
+    <button type="submit">Download Video</button>
+  </form>
+
+  <p><small>Note: Uploading cookies.txt allows downloading age-restricted and geo-blocked YouTube videos.</small></p>
+</body>
+</html>
