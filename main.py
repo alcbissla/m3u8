@@ -33,23 +33,13 @@ def download():
                 "User-Agent: Mozilla/5.0\r\n"
                 "Referer: https://example.com\r\n"
             )
-
             cmd = [
-                "ffmpeg",
-                "-headers", headers,
-                "-i", url,
-                "-c", "copy",
-                "-bsf:a", "aac_adtstoasc",
-                filename
+                "ffmpeg", "-headers", headers, "-i", url,
+                "-c", "copy", "-bsf:a", "aac_adtstoasc", filename
             ]
         else:
             # Use yt-dlp
-            cmd = [
-                "yt-dlp",
-                "-o", filename,
-                "-f", "mp4",
-                url
-            ]
+            cmd = ["yt-dlp", "-f", "mp4", "-o", filename, url]
 
         result = subprocess.run(cmd, capture_output=True, text=True)
 
@@ -63,4 +53,5 @@ def download():
             os.remove(filename)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
